@@ -486,3 +486,227 @@ app/views/articles/show.html.erb
     <%= comment.body %>
   </p>
 <% end %>
+
+
+Refactorización
+
+app/views/articles/show.html.erbplantilla. Se está volviendo largo e incómodo. Podemos usar parciales para limpiarlo.
+
+
+Representación de colecciones parciales
+
+app/views/comments/_comment.html.erb
+
+<p>
+  <strong>Commenter:</strong>
+  <%= comment.commenter %>
+</p>
+
+<p>
+  <strong>Comment:</strong>
+  <%= comment.body %>
+</p>
+
+
+Luego puedes cambiar app/views/articles/show.html.erb
+
+<h2>Comments</h2>
+<%= render @article.comments %>
+
+Representación de un formulario parcial
+
+app/views/comments/_form.html.erb
+
+<%= form_with model: [ @article, @article.comments.build ] do |form| %>
+  <p>
+    <%= form.label :commenter %><br>
+    <%= form.text_field :commenter %>
+  </p>
+  <p>
+    <%= form.label :body %><br>
+    <%= form.text_area :body %>
+  </p>
+  <p>
+    <%= form.submit %>
+  </p>
+<% end %>
+
+
+app/views/articles/show.html.erb
+
+<h2>Add a comment:</h2>
+<%= render 'comments/form' %>
+
+
+Uso de preocupaciones
+
+bin/rails generate migration AddStatusToArticles status:string
+bin/rails generate migration AddStatusToComments status:string
+
+
+bin/rails db:migrate
+
+
+app/controllers/articles_controller.rb
+
+  private
+    def article_params
+      params.require(:article).permit(:title, :body, :status)
+    end
+
+app/controllers/comments_controller.rb
+
+
+  private
+    def comment_params
+      params.require(:comment).permit(:commenter, :body, :status)
+    end
+
+bin/rails db:migrate
+
+
+
+class Article < ApplicationRecord
+  has_many :comments
+
+  validates :title, presence: true
+  validates :body, presence: true, length: { minimum: 10 }
+
+  VALID_STATUSES = ['public', 'private', 'archived']
+
+  validates :status, inclusion: { in: VALID_STATUSES }
+
+  def archived?
+    status == 'archived'
+  end
+end
+
+y en el Commentmodelo:
+
+class Comment < ApplicationRecord
+  belongs_to :article
+
+  VALID_STATUSES = ['public', 'private', 'archived']
+
+  validates :status, inclusion: { in: VALID_STATUSES }
+
+  def archived?
+    status == 'archived'
+  end
+end
+
+app/views/articles/index.html.erb
+
+<h1>Articles</h1>
+
+<ul>
+  <% @articles.each do |article| %>
+    <% unless article.archived? %>
+      <li>
+        <%= link_to article.title, article %>
+      </li>
+    <% end %>
+  <% end %>
+</ul>
+
+<%= link_to "New Article", new_article_path %>
+
+app/views/comments/_comment.html.erb
+
+<% unless comment.archived? %>
+  <p>
+    <strong>Commenter:</strong>
+    <%= comment.commenter %>
+  </p>
+
+  <p>
+    <strong>Comment:</strong>
+    <%= comment.body %>
+  </p>
+<% end %>
+
+app/models/concerns/visible.rb
+
+module Visible
+  def archived?
+    status == 'archived'
+  end
+end
+
+Ahora podemos eliminar la lógica duplicada de cada modelo y en su lugar incluir nuestro nuevo Visiblemódulo:
+
+En app/models/article.rb:
+
+class Article < ApplicationRecord
+  include Visible
+
+  has_many :comments
+
+  validates :title, presence: true
+  validates :body, presence: true, length: { minimum: 10 }
+end
+
+y en app/models/comment.rb:
+
+class Comment < ApplicationRecord
+  include Visible
+
+  belongs_to :article
+end
+
+Contador en visible:
+
+module Visible
+  extend ActiveSupport::Concern
+
+  VALID_STATUSES = ['public', 'private', 'archived']
+
+  included do
+    validates :status, inclusion: { in: VALID_STATUSES }
+  end
+
+  class_methods do
+    def public_count
+      where(status: 'public').count
+    end
+  end
+
+  def archived?
+    status == 'archived'
+  end
+end
+
+
+<h1>Articles</h1>
+
+Our blog has <%= Article.public_count %> articles and counting!
+
+<ul>
+  <% @articles.each do |article| %>
+    <% unless article.archived? %>
+      <li>
+        <%= link_to article.title, article %>
+      </li>
+    <% end %>
+  <% end %>
+</ul>
+
+<%= link_to "New Article", new_article_path %>
+
+app/views/articles/_form.html.erb
+
+<div>
+  <%= form.label :status %><br>
+  <%= form.select :status, Visible::VALID_STATUSES, selected: article.status || 'public' %>
+</div>
+
+y en app/views/comments/_form.html.erb:
+
+<p>
+  <%= form.label :status %><br>
+  <%= form.select :status, Visible::VALID_STATUSES, selected: 'public' %>
+</p>
+
+
+Eliminar comentarios
+
