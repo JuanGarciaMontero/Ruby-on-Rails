@@ -748,7 +748,7 @@ Autenticación básica
 app/controllers/articles_controller.rb
 
 class ArticlesController < ApplicationController
-  http_basic_authenticate_with name: "dhh", password: "secret", except: [:index, :show]
+  http_basic_authenticate_with name: "juan", password: "juan", except: [:index, :show]
 
   def index
     @articles = Article.all
@@ -759,6 +759,6 @@ app/controllers/comments_controller.rb
 
 class CommentsController < ApplicationController
 
-  http_basic_authenticate_with name: "dhh", password: "secret", only: 
+  http_basic_authenticate_with name: "juan", password: "juan", only: 
 :destroy
 
