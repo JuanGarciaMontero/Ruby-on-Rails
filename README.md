@@ -710,3 +710,55 @@ y en app/views/comments/_form.html.erb:
 
 Eliminar comentarios
 
+app/views/comments/_comment.html.erb
+
+<p>
+    <%= link_to "Destroy Comment", [comment.article, comment], data: {
+                  turbo_method: :delete,
+                  turbo_confirm: "Are you sure?"
+                } %>
+</p>
+
+app/controllers/comments_controller.rb
+
+def destroy
+    @article = Article.find(params[:article_id])
+    @comment = @article.comments.find(params[:id])
+    @comment.destroy
+    redirect_to article_path(@article), status: :see_other
+  end
+
+
+Eliminar objetos asociados
+
+app/models/article.rb
+
+class Article < ApplicationRecord
+    include Visible
+  
+    has_many :comments, dependent: :destroy
+  
+    validates :title, presence: true
+    validates :body, presence: true, length: { minimum: 10 }
+end
+
+Seguridad
+
+Autenticación básica
+app/controllers/articles_controller.rb
+
+class ArticlesController < ApplicationController
+  http_basic_authenticate_with name: "dhh", password: "secret", except: [:index, :show]
+
+  def index
+    @articles = Article.all
+  end
+
+Solo elimina los usuarios autenticados:
+app/controllers/comments_controller.rb
+
+class CommentsController < ApplicationController
+
+  http_basic_authenticate_with name: "dhh", password: "secret", only: 
+:destroy
+
